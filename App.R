@@ -12,7 +12,7 @@ ui <- shinydashboard::dashboardPage(
   header = shinydashboard::dashboardHeader(
     title = "Clue Assist?"
   ),
-  sidebar = shinydashboard::dashboardSidebar(),
+  sidebar = shinydashboard::dashboardSidebar(disable = TRUE),
   body = shinydashboard::dashboardBody(
     ###
     # SET GAME CONDITIONS
@@ -23,8 +23,30 @@ ui <- shinydashboard::dashboardPage(
       fluidRow(
         column( width = 12,
                 radioButtons("set_game_players", label = "Number of players (including yourself!)",
-                             choices = 3:6, selected = 4, inline = TRUE),
+                             choices = 3:6, selected = 3, inline = TRUE),
                 uiOutput("set_game_players_names_ui")
+        )
+      ),
+      conditionalPanel(
+        condition = "input.set_game_players == 4 | input.set_game_players == 5",
+        h3("What cards are public?"),
+        fluidRow(
+          column(width = 9,
+                 helpText("In games with 4 or 5 players, after each player is dealt an equal sized hand, extra cards are placed on the table for all to see. 
+                          Since all players know these cards, they have a different strategic value than the cards you are dealt.")
+                 ),
+          column(width = 3,
+                 checkboxGroupInput("set_game_who_pub" , label = "Who?",
+                                    choices = clue$who)
+          ),
+          column(width = 3,
+                 checkboxGroupInput("set_game_what_pub" , label = "What?",
+                                    choices = clue$what)
+          ),
+          column(width = 3,
+                 checkboxGroupInput("set_game_where_pub" , label = "Where?",
+                                    choices = clue$where)
+          )
         )
       ),
       h3("What cards have you been dealt?"),
