@@ -14,13 +14,16 @@ ui <- shinydashboard::dashboardPage(
   ),
   sidebar = shinydashboard::dashboardSidebar(),
   body = shinydashboard::dashboardBody(
+    ###
+    # SET GAME CONDITIONS
+    ###
     conditionalPanel(
       condition = "input.set_game == 0",
       h3("Who's playing?"),
       fluidRow(
         column( width = 12,
                 radioButtons("set_game_players", label = "Number of players (including yourself!)",
-                             choices = 2:6, selected = 4, inline = TRUE),
+                             choices = 3:6, selected = 4, inline = TRUE),
                 uiOutput("set_game_players_names_ui")
         )
       ),
@@ -55,7 +58,20 @@ ui <- shinydashboard::dashboardPage(
                               )
              ),
       actionButton("set_game", label = "Let's play!")
-    ) #End game setup conditional panel
+    ), #End game setup conditional panel
+    
+    ####
+    # GAME UI
+    ####
+    conditionalPanel(condition = "input.set_game > 0",
+      h2("Let's play!"),
+      #Here - suggested guess for next turn
+      #Here - table of  who, what, where with probabilities
+      
+      #Here - Rolling table of game turns
+      h3("Game turns"),
+      actionButton("turn_add", "Add a turn!")
+    ) #End Game UI conditional panel
   )
 )
 
@@ -80,8 +96,51 @@ server <- function(input, output, session) {
                  )
         )
       )
-      
     })
+  }) #End play list
+  
+  #Who are these players?
+  
+  player_list <- reactive({
+    p_list <- sapply(1:as.numeric(input$set_game_players), function(i){
+      sel_player <- input[[paste0("sel_game_players_", i)]]
+      
+      if(sel_player == ""){sel_player <- paste("Player", i)}
+
+      return(sel_player)
+    })
+    return(p_list)
+  })
+  
+  ####
+  # TRACK TURNS
+  ####
+  observeEvent(input$turn_add, {
+
+    insertUI(
+      selector = "#turn_add",
+      where = "afterEnd",
+      ui = tagList(
+        fluidRow(
+          column(width = 1, h2(input$turn_add)),
+          column(width = 3, selectInput(paste0("turn_", input$turn_add, "_who"),
+                                        label = "", choices = list("Who?" = "none", "Who?" = clue$who))),
+          column(width = 3, selectInput(paste0("turn_", input$turn_add, "_what"),
+                                        label = "", choices = list("What?" = "none", "What?" = clue$what))),
+          column(width = 3, selectInput(paste0("turn_", input$turn_add, "_where"),
+                                        label = "", choices = list("Where?" = "none", "Where?" = clue$where)))),
+        fluidRow(
+          column(width = 1),
+          column(width = 3, selectInput(paste0("turn_", input$turn_add, "_guessedby"),
+                                        label = "", choices = list("Guessed By" = "none", "Player" = player_list()))),
+          column(width = 3, selectInput(paste0("turn_", input$turn_add, "_disprovedby"),
+                                        label = "", choices = list("Disproved By" = "none", "Player" = player_list()))),
+          column(width = 3, selectInput(paste0("turn_", input$turn_add, "_disprovedclue"),
+                                        label = "", choices = list("Disproved Clue" = "none", "Clue" = clue)))
+        ), #ENd Row
+        hr()
+      )
+    )
   })
   
 }
