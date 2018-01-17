@@ -29,6 +29,17 @@ clue_tracker_table <- function(i, clue_list){
   return(rw)
 }
 
+calc_player_dist <- function(g_pos, d_pos, n_players, p_list){
+  dist <- (d_pos - g_pos) %% n_players - 1
+  
+  if(dist > 0){
+    players <- c(p_list, p_list)[(g_pos+1):(g_pos+dist)]
+  } else {
+    players <- ""
+  }
+  return(players)
+}
+
 
 ui <- shinydashboard::dashboardPage(
   header = shinydashboard::dashboardHeader(
@@ -111,7 +122,7 @@ ui <- shinydashboard::dashboardPage(
     ####
     conditionalPanel(condition = "input.set_game > 0",
       tabsetPanel(
-        tabPanel(title = "Spread a rumor",
+        tabPanel(title = "Rumors",
                  icon = icon("user-circle"),
                  h3("Suspect Probabilities"),
                  fluidRow(
@@ -185,8 +196,19 @@ server <- function(input, output, session) {
     return(p_list)
   })
   
+  #Which player are you?
+  player_list_me <- reactive({
+    req(player_list())
+    p_list <- sapply(1:as.numeric(input$set_game_players), function(i){
+      sel_player <- input[[paste0("set_game_players_", i, "_me")]]
+      
+      return(sel_player)
+    })
+    return(player_list()[p_list])
+  })
+  
   ####
-  # TRACK TURNS
+  # TRACK TURNS ----
   ####
   observeEvent(input$turn_add, {
 
@@ -241,17 +263,31 @@ server <- function(input, output, session) {
     return(turn_data)
   })
   
+  turn_tracker2 <- reactive({
+    req(turn_tracker())
+    
+    dat <- turn_tracker() %>% 
+      #Players who failed to disprove a rumor
+      rowwise() %>% 
+      mutate(cannot_disprove = map2(which(player_list == guessedby), which(player_list == disprovedby), function(a, b){
+        calc_player_dist(a, b, n_players, player_list)
+      })) %>% 
+      ungroup()
+    
+    return(dat)
+  })
+  
   output$turn_tracker_table <- renderTable({
     req(turn_tracker())
     dat <- turn_tracker() %>% 
-      rename(Turn = turn, `Who?` = who, `What?` = what, `Where?` = where, `Guessed by` = guessedby, `Disproved by` = disprovedby, `Diproved Clue` = disprovedclue) %>% 
+      select(Turn = turn, `Who?` = who, `What?` = what, `Where?` = where, `Guessed by` = guessedby, `Disproved by` = disprovedby, `Diproved Clue` = disprovedclue) %>% 
       mutate_if(is.character, funs(ifelse(. == "none", "", .)))
     
     return(head(dat, 5))
   })
   
   ####
-  # Clue Probabilities
+  # Clue Probabilities ----
   ####
   
   clue_tracker <- reactive({
@@ -311,6 +347,12 @@ server <- function(input, output, session) {
     
     return(list_wh)
   })
+  
+  ####
+  # Opponent hands ----
+  ####
+  
+  
   
 }
 
