@@ -110,30 +110,40 @@ ui <- shinydashboard::dashboardPage(
     # GAME UI
     ####
     conditionalPanel(condition = "input.set_game > 0",
-      h3("Suspect Probabilities"),
-      fluidRow(
-        column(width = 12,
-               helpText("These probabilities are based off of all known information. This includes cards you have seen, rumors that have been disproven, and players who have declined to disprove a rumor.")
-               )
-      ),
-      fluidRow(
-        column(width = 3,
-               htmlOutput("probs_who")
-               ),
-        column(width = 3,
-               htmlOutput("probs_what")
-        ),
-        column(width = 3,
-               htmlOutput("probs_where")
-        )
-      ),
-      h2("Let's play!"),
+      tabsetPanel(
+        tabPanel(title = "Spread a rumor",
+                 icon = icon("user-circle"),
+                 h3("Suspect Probabilities"),
+                 fluidRow(
+                   column(width = 12,
+                          helpText("These probabilities are based off of all known information. This includes cards you have seen, rumors that have been disproven, and players who have declined to disprove a rumor.")
+                   )
+                 ),
+                 fluidRow(
+                   column(width = 3,
+                          htmlOutput("probs_who")
+                   ),
+                   column(width = 3,
+                          htmlOutput("probs_what")
+                   ),
+                   column(width = 3,
+                          htmlOutput("probs_where")
+                   )
+                 )
+                 ),
+        tabPanel(title = "Game Turns",
+                 icon = icon("question"),
+                 h3("Last 5 Turns"),
+                 tableOutput("turn_tracker_table"),
+                 #actionButton("turn_log", "Update!"),
+                 actionButton("turn_add", "Add a turn!")),
+        tabPanel(title = "Player Hands",
+                 icon = icon("users"))
+      )
       #Here - suggested guess for next turn
-      #Here - table of  who, what, where with probabilities
       
       #Here - Rolling table of game turns
-      h3("Game turns"),
-      actionButton("turn_add", "Add a turn!")
+
     ) #End Game UI conditional panel
   )
 )
@@ -206,6 +216,40 @@ server <- function(input, output, session) {
     )
   }) #End turn tracker UI
   
+  turn_tracker <- reactive({
+
+    turn_add <- input$turn_add
+    
+    input_values <- reactiveValuesToList(input)
+    
+    if(input$turn_add == 0 | !any(grepl(paste0("turn_1_"), names(input_values)))){
+      return(NULL)
+    }
+    
+    turn_data <- tibble::tibble()
+    for(i in 1:turn_add){
+      dat <- dplyr::bind_cols(input_values[names(input_values)[grepl(paste0("turn_", i, "_"), names(input_values))]])
+      names(dat) <- gsub(paste0("turn_", i, "_"), "", names(dat))
+      
+      turn_data <- turn_data %>% dplyr::bind_rows(dat %>% mutate(turn = i))
+    }
+    
+    turn_data <- turn_data %>% dplyr::select(turn, who, what, where, 
+                                             guessedby, disprovedby, disprovedclue, 
+                                             everything()) %>% 
+      dplyr::arrange(desc(turn))
+    return(turn_data)
+  })
+  
+  output$turn_tracker_table <- renderTable({
+    req(turn_tracker())
+    dat <- turn_tracker() %>% 
+      rename(Turn = turn, `Who?` = who, `What?` = what, `Where?` = where, `Guessed by` = guessedby, `Disproved by` = disprovedby, `Diproved Clue` = disprovedclue) %>% 
+      mutate_if(is.character, funs(ifelse(. == "none", "", .)))
+    
+    return(head(dat, 5))
+  })
+  
   ####
   # Clue Probabilities
   ####
@@ -213,18 +257,20 @@ server <- function(input, output, session) {
   clue_tracker <- reactive({
     clue_list <- list()
     
+    disproved_clues <- if(is.null(turn_tracker())){NULL}else{turn_tracker()$disprovedclue}
+    
     #Who
-    set_who <- c(input$set_game_who, input$set_game_who_pub)
+    set_who <- c(input$set_game_who, input$set_game_who_pub, disproved_clues)
     clue_list[["who"]] <- !(clue$who %in% set_who)
     names(clue_list[["who"]]) <- clue$who
     
     #What
-    set_what <- c(input$set_game_what, input$set_game_what_pub)
+    set_what <- c(input$set_game_what, input$set_game_what_pub, disproved_clues)
     clue_list[["what"]] <- !(clue$what %in% set_what)
     names(clue_list[["what"]]) <- clue$what
     
     #Where
-    set_where <- c(input$set_game_where, input$set_game_where_pub)
+    set_where <- c(input$set_game_where, input$set_game_where_pub, disproved_clues)
     clue_list[["where"]] <- !(clue$where %in% set_where)
     names(clue_list[["where"]]) <- clue$where
     
