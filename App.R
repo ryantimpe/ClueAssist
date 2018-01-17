@@ -1,5 +1,7 @@
 library(shiny); library(shinydashboard)
+library(purrr); library(dplyr)
 
+#HELPERS TO BE MOVED LATER
 clue <- list(
   who = c("Dorothy", "Blanche", "Rose", "Sophia", "Stan", "Miles"),
   what = c("Bathrobe", "Feathered Slipper", "Lipstick", "Ratan Chair", "Sophia's Purse", "Whipped Cream"),
@@ -7,6 +9,26 @@ clue <- list(
             "The Kitchen", "The Bathroom",
             "The Lanai", "The Front Yard", "The Garage")
 )
+
+clue_tracker_table <- function(i, clue_list){
+  if(clue_list[i] == 0){
+    rw <- paste0("<tr>", "<td style='color:#999999'> ",
+                 names(clue_list)[i], "</td> <td style='color:#999999'>", 
+                 round(clue_list[i]*100), "%", " </td></tr>")
+  } else if(clue_list[i] == 1){
+    rw <- paste0("<tr>", "<td style='color:#4040FF; background-color:#FFFF40; font-weight:bold'> ",
+                 names(clue_list)[i], "</td> <td style='color:#FF4040'>", 
+                 round(clue_list[i]*100), "%", " </td></tr>")
+  } else if(clue_list[i] == max(clue_list, na.rm=TRUE)){
+    rw <- paste0("<tr>", "<td style='color:#FF4040; font-weight:bold'> ",
+                 names(clue_list)[i], "</td> <td style='color:#FF4040'>", 
+                 round(clue_list[i]*100), "%", " </td></tr>")
+  } else {
+    rw <- paste0("<tr><td>", names(clue_list)[i], " <td>", round(clue_list[i]*100), "%", " </tr>")
+  }
+  return(rw)
+}
+
 
 ui <- shinydashboard::dashboardPage(
   header = shinydashboard::dashboardHeader(
@@ -34,7 +56,9 @@ ui <- shinydashboard::dashboardPage(
           column(width = 9,
                  helpText("In games with 4 or 5 players, after each player is dealt an equal sized hand, extra cards are placed on the table for all to see. 
                           Since all players know these cards, they have a different strategic value than the cards you are dealt.")
-                 ),
+                 )
+          ),
+        fluidRow(
           column(width = 3,
                  checkboxGroupInput("set_game_who_pub" , label = "Who?",
                                     choices = clue$who)
@@ -86,6 +110,23 @@ ui <- shinydashboard::dashboardPage(
     # GAME UI
     ####
     conditionalPanel(condition = "input.set_game > 0",
+      h3("Suspect Probabilities"),
+      fluidRow(
+        column(width = 12,
+               helpText("These probabilities are based off of all known information. This includes cards you have seen, rumors that have been disproven, and players who have declined to disprove a rumor.")
+               )
+      ),
+      fluidRow(
+        column(width = 3,
+               htmlOutput("probs_who")
+               ),
+        column(width = 3,
+               htmlOutput("probs_what")
+        ),
+        column(width = 3,
+               htmlOutput("probs_where")
+        )
+      ),
       h2("Let's play!"),
       #Here - suggested guess for next turn
       #Here - table of  who, what, where with probabilities
@@ -109,11 +150,11 @@ server <- function(input, output, session) {
       list(
         fluidRow(
           column(width = 3,
-                 textInput(inputId = paste0("sel_game_players_", i), 
+                 textInput(inputId = paste0("set_game_players_", i), 
                            label = paste("Player", i))
                  ),
           column(width = 9,
-                 checkboxInput(inputId = paste0("sel_game_players_", i, "_me"), 
+                 checkboxInput(inputId = paste0("set_game_players_", i, "_me"), 
                                label = "This is me!")
                  )
         )
@@ -125,7 +166,7 @@ server <- function(input, output, session) {
   
   player_list <- reactive({
     p_list <- sapply(1:as.numeric(input$set_game_players), function(i){
-      sel_player <- input[[paste0("sel_game_players_", i)]]
+      sel_player <- input[[paste0("set_game_players_", i)]]
       
       if(sel_player == ""){sel_player <- paste("Player", i)}
 
@@ -163,6 +204,66 @@ server <- function(input, output, session) {
         hr()
       )
     )
+  }) #End turn tracker UI
+  
+  ####
+  # Clue Probabilities
+  ####
+  
+  clue_tracker <- reactive({
+    clue_list <- list()
+    
+    #Who
+    set_who <- c(input$set_game_who, input$set_game_who_pub)
+    clue_list[["who"]] <- !(clue$who %in% set_who)
+    names(clue_list[["who"]]) <- clue$who
+    
+    #What
+    set_what <- c(input$set_game_what, input$set_game_what_pub)
+    clue_list[["what"]] <- !(clue$what %in% set_what)
+    names(clue_list[["what"]]) <- clue$what
+    
+    #Where
+    set_where <- c(input$set_game_where, input$set_game_where_pub)
+    clue_list[["where"]] <- !(clue$where %in% set_where)
+    names(clue_list[["where"]]) <- clue$where
+    
+    return(clue_list)
+  })
+  
+  rumor_prior <- reactive({
+    lapply(clue_tracker(), function(x){x/sum(x)})
+  })
+  
+  output$probs_who <- renderText({
+    set_wh <- sort(rumor_prior()$who, decreasing = TRUE)
+    
+    list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
+    
+    list_wh <- paste("<table><col width='130'><col width='80'>", 
+                      paste(unlist(list_wh), collapse = " "), "</table>")
+    
+    return(list_wh)
+  })
+  output$probs_what <- renderText({
+    set_wh <- sort(rumor_prior()$what, decreasing = TRUE)
+    
+    list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
+    
+    list_wh <- paste("<table><col width='130'><col width='80'>", 
+                     paste(unlist(list_wh), collapse = " "), "</table>")
+    
+    return(list_wh)
+  })
+  output$probs_where <- renderText({
+    set_wh <- sort(rumor_prior()$where, decreasing = TRUE)
+    
+    list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
+    
+    list_wh <- paste("<table><col width='130'><col width='80'>", 
+                     paste(unlist(list_wh), collapse = " "), "</table>")
+    
+    return(list_wh)
   })
   
 }
