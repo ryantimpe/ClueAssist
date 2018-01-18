@@ -1,9 +1,11 @@
 library(shiny); library(shinydashboard)
 library(purrr); library(dplyr)
 
+source("helpers.R")
+
 ui <- shinydashboard::dashboardPage(
   header = shinydashboard::dashboardHeader(
-    title = "Clue Assist?"
+    title = "Clue Assist?!"
   ),
   sidebar = shinydashboard::dashboardSidebar(disable = TRUE),
   body = shinydashboard::dashboardBody(
@@ -32,15 +34,15 @@ ui <- shinydashboard::dashboardPage(
         fluidRow(
           column(width = 3,
                  checkboxGroupInput("set_game_who_pub" , label = "Who?",
-                                    choices = clue$who)
+                                    choices = clue_master_list$who)
           ),
           column(width = 3,
                  checkboxGroupInput("set_game_what_pub" , label = "What?",
-                                    choices = clue$what)
+                                    choices = clue_master_list$what)
           ),
           column(width = 3,
                  checkboxGroupInput("set_game_where_pub" , label = "Where?",
-                                    choices = clue$where)
+                                    choices = clue_master_list$where)
           )
         )
       ),
@@ -48,15 +50,15 @@ ui <- shinydashboard::dashboardPage(
       fluidRow(
         column(width = 3,
                checkboxGroupInput("set_game_who" , label = "Who?",
-                                  choices = clue$who)
+                                  choices = clue_master_list$who)
                ),
         column(width = 3,
                checkboxGroupInput("set_game_what" , label = "What?",
-                                  choices = clue$what)
+                                  choices = clue_master_list$what)
         ),
         column(width = 3,
                checkboxGroupInput("set_game_where" , label = "Where?",
-                                  choices = clue$where)
+                                  choices = clue_master_list$where)
         )
       ), #End Row
       h3("What's your style?"),
@@ -179,11 +181,11 @@ server <- function(input, output, session) {
         fluidRow(
           column(width = 1, h2(input$turn_add)),
           column(width = 3, selectInput(paste0("turn_", input$turn_add, "_who"),
-                                        label = "", choices = list("Who?" = "none", "Who?" = clue$who))),
+                                        label = "", choices = list("Who?" = "none", "Who?" = clue_master_list$who))),
           column(width = 3, selectInput(paste0("turn_", input$turn_add, "_what"),
-                                        label = "", choices = list("What?" = "none", "What?" = clue$what))),
+                                        label = "", choices = list("What?" = "none", "What?" = clue_master_list$what))),
           column(width = 3, selectInput(paste0("turn_", input$turn_add, "_where"),
-                                        label = "", choices = list("Where?" = "none", "Where?" = clue$where)))),
+                                        label = "", choices = list("Where?" = "none", "Where?" = clue_master_list$where)))),
         fluidRow(
           column(width = 1),
           column(width = 3, selectInput(paste0("turn_", input$turn_add, "_guessedby"),
@@ -250,32 +252,82 @@ server <- function(input, output, session) {
   # Clue Probabilities ----
   ####
   
-  clue_tracker <- reactive({
+  rumor_prior <- reactive({
     clue_list <- list()
     
     disproved_clues <- if(is.null(turn_tracker())){NULL}else{turn_tracker()$disprovedclue}
     
     #Who
     set_who <- c(input$set_game_who, input$set_game_who_pub, disproved_clues)
-    clue_list[["who"]] <- !(clue$who %in% set_who)
-    names(clue_list[["who"]]) <- clue$who
+    clue_list[["who"]] <- !(clue_master_list$who %in% set_who)
+    names(clue_list[["who"]]) <- clue_master_list$who
     
     #What
     set_what <- c(input$set_game_what, input$set_game_what_pub, disproved_clues)
-    clue_list[["what"]] <- !(clue$what %in% set_what)
-    names(clue_list[["what"]]) <- clue$what
+    clue_list[["what"]] <- !(clue_master_list$what %in% set_what)
+    names(clue_list[["what"]]) <- clue_master_list$what
     
     #Where
     set_where <- c(input$set_game_where, input$set_game_where_pub, disproved_clues)
-    clue_list[["where"]] <- !(clue$where %in% set_where)
-    names(clue_list[["where"]]) <- clue$where
+    clue_list[["where"]] <- !(clue_master_list$where %in% set_where)
+    names(clue_list[["where"]]) <- clue_master_list$where
     
-    return(clue_list)
+    lapply(clue_list, function(x){x/sum(x)})
   })
   
-  rumor_prior <- reactive({
-    lapply(clue_tracker(), function(x){x/sum(x)})
+  
+  ###
+  # Individual clue trackers
+  ###
+  clue_tracker_by_me <- reactive({
+    clues_possessed_by_me <- tibble::tibble(clue_type = "who", clue = input$set_game_who) %>% 
+      bind_rows(tibble::tibble(clue_type = "what", clue = input$set_game_what)) %>% 
+      bind_rows(tibble::tibble(clue_type = "where", clue = input$set_game_where)) %>% 
+      mutate(player = player_list_me())
+    
+    return(clues_possessed_by_me)
   })
+  
+  clue_tracker_by_public <- reactive({
+    clues_possessed_by_public <- tibble::tibble(clue_type = "who", clue = input$set_game_who_pub) %>% 
+      bind_rows(tibble::tibble(clue_type = "what", clue = input$set_game_what_pub)) %>% 
+      bind_rows(tibble::tibble(clue_type = "where", clue = input$set_game_where_pub)) %>% 
+      mutate(player = ".PublicPool")
+    
+    return(clues_possessed_by_public)
+  })
+  
+  clue_tracker <- reactive({
+    req(turn_tracker2())
+    
+    dat <- turn_tracker2
+    
+    #3-Series data frames... clue_type, clue, player
+    clues_possessed_by_me <- clue_tracker_by_me()
+    clues_possessed_by_public <- clue_tracker_by_public()
+    
+    #Clues Possessed, as learned from reveals to Me
+    clues_possessed_by_others <- dat %>% 
+      filter(disprovedclue != "none") %>% 
+      select(player = disprovedby, clue = disprovedclue) %>% 
+      mutate(clue_type = case_when(
+        clue %in% clue_master_list$who ~ "who",
+        clue %in% clue_master_list$what ~ "what", 
+        clue %in% clue_master_list$what ~ "where",
+        TRUE ~ "error"
+      ))
+    
+    #Create a 3-series data frame of each card NOT possessed by players
+    clues_not_possessed <- dat %>% 
+      unnest(cannot_disprove) %>% 
+      select(player = cannot_disprove, who, what, where) %>% 
+      filter(player != "") %>% 
+      gather(clue_type, clue, who, what, where) %>% 
+      distinct() %>% 
+      arrange(player, clue_type)
+  })
+  
+  #Print Table - redo this later
   
   output$probs_who <- renderText({
     set_wh <- sort(rumor_prior()$who, decreasing = TRUE)
@@ -307,10 +359,9 @@ server <- function(input, output, session) {
     
     return(list_wh)
   })
+
   
-  ####
-  # Opponent hands ----
-  ####
+
   
   
   
