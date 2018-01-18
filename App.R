@@ -317,6 +317,15 @@ server <- function(input, output, session) {
         TRUE ~ "error"
       ))
     
+    #Clues MAYBE possessed by others... 
+    #... when someone privately disproves a rumor, theres a 33%, 50%, or 100% chance we know the clue
+    clues_maybe_possessed <- dat %>% 
+      filter(disprovedclue == "none") %>% 
+      select(-guessedby, -cannot_disprove, -disprovedclue) %>% 
+      rename(player = disprovedby) %>% 
+      gather(clue_type, clue, who, what, where) %>% 
+      arrange(turn)
+    
     #Create a 3-series data frame of each card NOT possessed by players
     clues_not_possessed <- dat %>% 
       unnest(cannot_disprove) %>% 
