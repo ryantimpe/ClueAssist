@@ -23,17 +23,17 @@ clue_tracker_table <- function(i, clue_list){
   if(clue_list[i] == 0){
     rw <- paste0("<tr>", "<td style='color:#999999'> ",
                  names(clue_list)[i], "</td> <td style='color:#999999'>", 
-                 round(clue_list[i]*100), "%", " </td></tr>")
-  } else if(clue_list[i] == 1){
+                 round(clue_list[i]), "%", " </td></tr>")
+  } else if(clue_list[i] == 100){
     rw <- paste0("<tr>", "<td style='color:#4040FF; background-color:#FFFF40; font-weight:bold'> ",
                  names(clue_list)[i], "</td> <td style='color:#FF4040'>", 
-                 round(clue_list[i]*100), "%", " </td></tr>")
+                 round(clue_list[i]), "%", " </td></tr>")
   } else if(clue_list[i] == max(clue_list, na.rm=TRUE)){
     rw <- paste0("<tr>", "<td style='color:#FF4040; font-weight:bold'> ",
                  names(clue_list)[i], "</td> <td style='color:#FF4040'>", 
-                 round(clue_list[i]*100), "%", " </td></tr>")
+                 round(clue_list[i]), "%", " </td></tr>")
   } else {
-    rw <- paste0("<tr><td>", names(clue_list)[i], " <td>", round(clue_list[i]*100), "%", " </tr>")
+    rw <- paste0("<tr><td>", names(clue_list)[i], " <td>", round(clue_list[i]), "%", " </tr>")
   }
   return(rw)
 }

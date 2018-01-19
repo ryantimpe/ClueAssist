@@ -86,22 +86,23 @@ ui <- shinydashboard::dashboardPage(
       tabsetPanel(
         tabPanel(title = "Rumors",
                  icon = icon("user-circle"),
-                 h3("Suspect Probabilities"),
+                 h3("What's in the envelope?"),
                  fluidRow(
                    column(width = 12,
                           helpText("These probabilities are based off of all known information. This includes cards you have seen, rumors that have been disproven, and players who have declined to disprove a rumor.")
                    )
                  ),
                  fluidRow(
-                   column(width = 3,
-                          htmlOutput("probs_who")
-                   ),
-                   column(width = 3,
-                          htmlOutput("probs_what")
-                   ),
-                   column(width = 3,
-                          htmlOutput("probs_where")
-                   )
+                   uiOutput("whats_in_the_envelope")
+                   # column(width = 3,
+                   #        htmlOutput("probs_who")
+                   # ),
+                   # column(width = 3,
+                   #        htmlOutput("probs_what")
+                   # ),
+                   # column(width = 3,
+                   #        htmlOutput("probs_where")
+                   # )
                  ),
                  fluidRow(
                    column(width = 12, tableOutput("clue_tracker_table"))
@@ -413,48 +414,73 @@ server <- function(input, output, session) {
       scale_to_player(player_list) %>%
       mutate(.prob_scaled = round(.prob_scaled, 0))
     
-    clue_tracker_spread <- clue_tracker2 %>% 
-      select(clue_type, clue, player, .prob_scaled) %>% 
-      spread(player, .prob_scaled)
-    
-    return(clue_tracker_spread)
+    return(clue_tracker2)
   })
   
+  ###
+  # Probability Tables
+  ###
   output$clue_tracker_table <- renderTable(
-    clue_tracker()
+    clue_tracker() %>% 
+      select(clue_type, clue, player, .prob_scaled) %>% 
+      spread(player, .prob_scaled)
   )
   #Print Table - redo this later
   
-  output$probs_who <- renderText({
-    set_wh <- sort(rumor_prior()$who, decreasing = TRUE)
+  output$whats_in_the_envelope <- renderUI({
     
-    list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
+    clue_probs <- lapply(c("who", "what", "where"), function(y){
+      set_wh <- clue_tracker() %>% filter(clue_type == y, player == ".Envelope") %>% 
+        pull(.prob_scaled)
+      names(set_wh) <- clue_tracker() %>% filter(clue_type == y, player == ".Envelope") %>% 
+        pull(clue)
+      set_wh <- sort(set_wh, decreasing = TRUE)
+      
+      list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
+      
+      list_wh <- paste("<table><col width='130'><col width='80'>", 
+                       paste(unlist(list_wh), collapse = " "), "</table>")
+      return(list_wh)
+    })
+
+    return(tagList(
+      column(width = 3, HTML(clue_probs[[1]])),
+      column(width = 3, HTML(clue_probs[[2]])),
+      column(width = 3, HTML(clue_probs[[3]]))
+    ))
     
-    list_wh <- paste("<table><col width='130'><col width='80'>", 
-                      paste(unlist(list_wh), collapse = " "), "</table>")
-    
-    return(list_wh)
   })
-  output$probs_what <- renderText({
-    set_wh <- sort(rumor_prior()$what, decreasing = TRUE)
-    
-    list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
-    
-    list_wh <- paste("<table><col width='130'><col width='80'>", 
-                     paste(unlist(list_wh), collapse = " "), "</table>")
-    
-    return(list_wh)
-  })
-  output$probs_where <- renderText({
-    set_wh <- sort(rumor_prior()$where, decreasing = TRUE)
-    
-    list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
-    
-    list_wh <- paste("<table><col width='130'><col width='80'>", 
-                     paste(unlist(list_wh), collapse = " "), "</table>")
-    
-    return(list_wh)
-  })
+  
+  # output$probs_who <- renderText({
+  #   set_wh <- sort(rumor_prior()$who, decreasing = TRUE)
+  #   
+  #   list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
+  #   
+  #   list_wh <- paste("<table><col width='130'><col width='80'>", 
+  #                     paste(unlist(list_wh), collapse = " "), "</table>")
+  #   
+  #   return(list_wh)
+  # })
+  # output$probs_what <- renderText({
+  #   set_wh <- sort(rumor_prior()$what, decreasing = TRUE)
+  #   
+  #   list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
+  #   
+  #   list_wh <- paste("<table><col width='130'><col width='80'>", 
+  #                    paste(unlist(list_wh), collapse = " "), "</table>")
+  #   
+  #   return(list_wh)
+  # })
+  # output$probs_where <- renderText({
+  #   set_wh <- sort(rumor_prior()$where, decreasing = TRUE)
+  #   
+  #   list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
+  #   
+  #   list_wh <- paste("<table><col width='130'><col width='80'>", 
+  #                    paste(unlist(list_wh), collapse = " "), "</table>")
+  #   
+  #   return(list_wh)
+  # })
 
   
 
