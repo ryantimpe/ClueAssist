@@ -237,8 +237,10 @@ server <- function(input, output, session) {
     dat <- turn_tracker() %>% 
       #Players who failed to disprove a rumor
       rowwise() %>% 
-      mutate(disprovedby2 = ifelse(disprovedby == "none", 0, which(player_list == disprovedby))) %>% 
-      mutate(cannot_disprove = map2(which(player_list == guessedby), disprovedby2, function(a, b){
+      mutate(
+        guessedby2 = ifelse(guessedby == "none", 0, which(player_list == guessedby)),
+        disprovedby2 = ifelse(disprovedby == "none", 0, which(player_list == disprovedby))) %>% 
+      mutate(cannot_disprove = map2(guessedby2, disprovedby2, function(a, b){
         calc_player_dist(a, b, n_players, player_list)
       })) %>% 
       ungroup()
@@ -372,11 +374,14 @@ server <- function(input, output, session) {
                                clues_possessed_by_public, 
                                clues_possessed_by_others)) %>% 
                   distinct() %>% 
-                  mutate(.verified = 1)) %>% 
+                  mutate(.verified = 1),
+                by = c("clue_type", "clue", "player")) %>% 
       #Bring in possible clues
-      left_join(clues_maybe_possessed %>% rename(.possible = n)) %>% 
+      left_join(clues_maybe_possessed %>% rename(.possible = n),
+                by = c("clue_type", "clue", "player")) %>% 
       #Bring in known NON possessions
-      left_join(clues_not_possessed %>% mutate(.notpossessed = 0)) %>% 
+      left_join(clues_not_possessed %>% mutate(.notpossessed = 0),
+                by = c("clue_type", "clue", "player")) %>% 
       #Check for issues
       mutate(flag = .verified == 1 & .notpossessed == 0) %>% 
       #Go over what we know by clue
@@ -396,13 +401,13 @@ server <- function(input, output, session) {
     #Iterative scaling for probabilities... tying Clue distribution to 1 and PLayer distribution to N
     clue_tracker2 <- clue_tracker %>% 
       scale_to_clue() %>% 
-      scale_to_player() %>% 
+      scale_to_player(player_list) %>% 
       scale_to_clue() %>% 
-      scale_to_player() %>% 
+      scale_to_player(player_list) %>% 
       scale_to_clue() %>% 
-      scale_to_player() %>% 
+      scale_to_player(player_list) %>% 
       scale_to_clue() %>% 
-      scale_to_player() %>%
+      scale_to_player(player_list) %>%
       mutate(.prob_scaled = round(.prob_scaled, 0))
     
     clue_tracker_spread <- clue_tracker2 %>% 

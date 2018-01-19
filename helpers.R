@@ -41,7 +41,9 @@ clue_tracker_table <- function(i, clue_list){
 calc_player_dist <- function(g_pos, d_pos, n_players, p_list){
   dist <- (d_pos - g_pos) %% n_players - 1
   
-  if(d_pos == 0){
+  if(g_pos == 0){
+    players <- ""
+  } else if(d_pos == 0){
     players <- p_list[-g_pos]
   } else if(dist > 0){
     players <- c(p_list, p_list)[(g_pos+1):(g_pos+dist)]
@@ -56,13 +58,15 @@ calc_player_dist <- function(g_pos, d_pos, n_players, p_list){
 scale_to_clue <- function(df){
   dat <- df %>% 
     group_by(clue) %>% 
+    mutate(.prob_scaled = ifelse(any(.prob_scaled >= 100) & .prob_scaled < 100, 0, .prob_scaled)) %>% 
     mutate(.prob_scaled = .prob_scaled / sum(.prob_scaled) * 100) %>% 
     ungroup()
   
   return(dat)
 }
 
-scale_to_player <- function(df){
+scale_to_player <- function(df, p_list){
+
   dat <- df %>% 
     #Rescale Envelope probabilities
     group_by(player, clue_type) %>% 
@@ -72,7 +76,7 @@ scale_to_player <- function(df){
     #Player Rescale
     group_by(player) %>% 
     mutate(how.many.100 = sum(.prob_scaled == 100),
-           what.to.scale = (clue_counts(length(player_list))$clues - how.many.100)) %>% 
+           what.to.scale = (clue_counts(length(p_list))$clues - how.many.100)) %>% 
     mutate(.prob_scaled = ifelse((player != ".Envelope" & player != ".PublicClues") & .prob_scaled != 100 & .prob_scaled != 0, 
                                  (.prob_scaled / (sum(.prob_scaled) - how.many.100*100)) * 100 * what.to.scale, 
                                  .prob_scaled)) %>% 
