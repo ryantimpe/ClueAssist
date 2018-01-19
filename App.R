@@ -183,6 +183,11 @@ server <- function(input, output, session) {
       ui = tagList(
         fluidRow(
           column(width = 1, h2(input$turn_add)),
+          column(width = 3, selectInput(paste0("turn_", input$turn_add, "_guessedby"),
+                                        label = "Who's turn?", choices = list("Guessed By" = "none", "Player" = player_list())))
+        ),
+        fluidRow(
+          column(width = 1),
           column(width = 3, selectInput(paste0("turn_", input$turn_add, "_who"),
                                         label = "", choices = list("Who?" = "none", "Who?" = clue_master_list$who))),
           column(width = 3, selectInput(paste0("turn_", input$turn_add, "_what"),
@@ -191,8 +196,6 @@ server <- function(input, output, session) {
                                         label = "", choices = list("Where?" = "none", "Where?" = clue_master_list$where)))),
         fluidRow(
           column(width = 1),
-          column(width = 3, selectInput(paste0("turn_", input$turn_add, "_guessedby"),
-                                        label = "", choices = list("Guessed By" = "none", "Player" = player_list()))),
           column(width = 3, selectInput(paste0("turn_", input$turn_add, "_disprovedby"),
                                         label = "", choices = list("Disproved By" = "none", "Player" = player_list()))),
           column(width = 3, selectInput(paste0("turn_", input$turn_add, "_disprovedclue"),
