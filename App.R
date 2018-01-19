@@ -1,5 +1,5 @@
 library(shiny); library(shinydashboard)
-library(purrr); library(dplyr)
+library(purrr); library(dplyr); library(glue)
 
 source("helpers.R")
 
@@ -17,9 +17,11 @@ ui <- shinydashboard::dashboardPage(
       h3("Who's playing?"),
       fluidRow(
         column( width = 12,
-                radioButtons("set_game_players", label = "Number of players (including yourself!)",
-                             choices = 3:6, selected = 3, inline = TRUE),
-                uiOutput("set_game_players_names_ui"),
+                # radioButtons("set_game_players", label = "Number of players (including yourself!)",
+                #              choices = 3:6, selected = 3, inline = TRUE),
+                #uiOutput("set_game_players_names_ui"),
+                actionButton("set_game_players_add", "Add a player"),
+                #actionButton("set_game_players_rem", "Drop a player"),
                 span(textOutput("set_game_player_text"), style = "color:#0063fb; font-size:14pt")
         )
       ),
@@ -130,27 +132,63 @@ server <- function(input, output, session) {
   ###
   
   #PLayers 
-  output$set_game_players_names_ui <- renderUI({
-    lapply(1:as.numeric(input$set_game_players), function(i){
-      list(
-        fluidRow(
-          column(width = 3,
-                 textInput(inputId = paste0("set_game_players_", i), 
-                           label = paste("Player", i))
-                 ),
-          column(width = 9,
-                 checkboxInput(inputId = paste0("set_game_players_", i, "_me"), 
-                               label = "This is me!")
-                 )
-        )
-      )
-    })
-  }) #End play list
+  # output$set_game_players_names_ui <- renderUI({
+  #   lapply(1:as.numeric(input$set_game_players), function(i){
+  #     list(
+  #       fluidRow(
+  #         column(width = 3,
+  #                textInput(inputId = paste0("set_game_players_", i), 
+  #                          label = paste("Player", i))
+  #                ),
+  #         column(width = 9,
+  #                checkboxInput(inputId = paste0("set_game_players_", i, "_me"), 
+  #                              label = "This is me!")
+  #                )
+  #       )
+  #     )
+  #   })
+  # }) #End play list
   
   #Who are these players?
   
+  observeEvent(list(input$set_game_players_add), {
+    
+    # num_add <- input$set_game_players_add - input$set_game_players_rem + 1
+    num_add <- input$set_game_players_add + 1
+    
+    if(num_add <= 6 & num_add >= 1){
+      insertUI(
+        selector = "#set_game_players_add",
+        where = "beforeBegin",
+        ui = textInput(inputId = paste0("set_game_players_", num_add), 
+                       label = paste0("Player ", num_add))
+      )
+    }
+  }) #End turn tracker UI
+  
+  # observeEvent(list(input$set_game_players_rem), {
+  #   
+  #   num_add <- input$set_game_players_add - input$set_game_players_rem + 2
+  #   
+  #   if(num_add > 1){
+  #     removeUI(
+  #       selector = paste0("div:has(> #set_game_players_", num_add, ")")
+  #     )
+  #   }
+  # }, ignoreInit = TRUE) #End turn tracker UI
+  
+  player_count <- reactive({
+    input_values <- reactiveValuesToList(input)
+    
+    n_player <- min(input$set_game_players_add + 1, 6)
+    
+    return(n_player)
+
+  })
+  
   player_list <- reactive({
-    p_list <- sapply(1:as.numeric(input$set_game_players), function(i){
+    
+    p_list <- sapply(1:as.numeric(player_count()), function(i){
       sel_player <- input[[paste0("set_game_players_", i)]]
       
       if(sel_player == ""){sel_player <- paste("Player", i)}
@@ -163,7 +201,7 @@ server <- function(input, output, session) {
   #Which player are you?
   player_list_me <- reactive({
     req(player_list())
-    p_list <- sapply(1:as.numeric(input$set_game_players), function(i){
+    p_list <- sapply(1:as.numeric(player_count()), function(i){
       sel_player <- input[[paste0("set_game_players_", i, "_me")]]
       
       return(sel_player)
@@ -173,11 +211,15 @@ server <- function(input, output, session) {
   
   #CLue count helper text
   output$set_game_player_text <- renderText({
-    num_players <- as.numeric(input$set_game_players)
+    num_players <- as.numeric(player_count())
     
     clue_cnt <- clue_counts(num_players)
     
-    txt1 <- glue::glue("In games with {num_players} players, each player receives {clue_cnt[[1]]} clues cards.")
+    txt1 <- if(num_players < 3){
+      "Your game needs at least 3 players to use the Clue Assist tool. Please add another."
+    } else {
+      glue::glue("In games with {num_players} players, each player receives {clue_cnt[[1]]} clues cards.")
+    }
     txt2 <- if(num_players %in% 4:5){
       glue::glue("With this number of players, the remaining {clue_cnt[[2]]} clues are placed face-up on the table for all players to see.")
     } else {""}
