@@ -25,7 +25,7 @@ clue_tracker_table <- function(i, clue_list){
                  names(clue_list)[i], "</td> <td style='color:#999999'>", 
                  round(clue_list[i]), "%", " </td></tr>")
   } else if(clue_list[i] == 100){
-    rw <- paste0("<tr>", "<td style='color:#4040FF; background-color:#FFFF40; font-weight:bold'> ",
+    rw <- paste0("<tr>", "<td style='color:#0063fb; background-color:#FFFF40; font-weight:bold'> ",
                  names(clue_list)[i], "</td> <td style='color:#FF4040'>", 
                  round(clue_list[i]), "%", " </td></tr>")
   } else if(clue_list[i] == max(clue_list, na.rm=TRUE)){

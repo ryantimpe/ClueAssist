@@ -19,12 +19,13 @@ ui <- shinydashboard::dashboardPage(
         column( width = 12,
                 radioButtons("set_game_players", label = "Number of players (including yourself!)",
                              choices = 3:6, selected = 3, inline = TRUE),
-                uiOutput("set_game_players_names_ui")
+                uiOutput("set_game_players_names_ui"),
+                span(textOutput("set_game_player_text"), style = "color:#0063fb; font-size:14pt")
         )
       ),
       conditionalPanel(
         condition = "input.set_game_players == 4 | input.set_game_players == 5",
-        h3("What cards are public?"),
+        h3("Which clues are public?"),
         fluidRow(
           column(width = 9,
                  helpText("In games with 4 or 5 players, after each player is dealt an equal sized hand, extra cards are placed on the table for all to see. 
@@ -46,7 +47,7 @@ ui <- shinydashboard::dashboardPage(
           )
         )
       ),
-      h3("What cards have you been dealt?"),
+      h3("Which clue have you been dealt?"),
       fluidRow(
         column(width = 3,
                checkboxGroupInput("set_game_who" , label = "Who?",
@@ -62,20 +63,25 @@ ui <- shinydashboard::dashboardPage(
         )
       ), #End Row
       h3("What's your style?"),
-      column(width = 12,
-             radioButtons("set_game_style", label = "",
-                          choices = c("Methodical" = "methodical", "Bold" = "bold")),
-             conditionalPanel(condition = "input.set_game_style == 'methodical'",
-                              HTML("You're a true Sherlock Holmes. Slowly chip away all the false rumors until you're left with the simple truth. <br/>
-                                       <b>Pros:</b> You'll make calm, calculated guesses while keeping your cards and notes close to your chest. <br/>
-                                       <b>Cons:</b> You're playing the long game. Someone might solve the crime before you!")
-                              ),
-             conditionalPanel(condition = "input.set_game_style == 'bold'",
-                              HTML("Fish with dynamite. Keep your opponents guessing. <br/>
-                                       <b>Pros:</b> Your game will be driven with bold, high probabilty guesses and the occassional self-incrimation to keep your opponents on their toes. <br/>
-                                       <b>Cons:</b> This is a quick game. If you're too bold too often, your opponents will learn your hand.")
-                              )
-             ),
+      fluidRow(
+        column(width = 12,
+               radioButtons("set_game_style", label = "",
+                            choices = c("Methodical" = "methodical", "Bold" = "bold")),
+               span(
+                 conditionalPanel(condition = "input.set_game_style == 'methodical'",
+                                  HTML("You're a true Sherlock Holmes. Slowly chip away all the false rumors until you're left with the simple truth. <br/>
+                                           <b>Pros:</b> You'll make calm, calculated guesses while keeping your cards and notes close to your chest. <br/>
+                                           <b>Cons:</b> You're playing the long game. Someone might solve the crime before you!")
+                                  ),
+                 conditionalPanel(condition = "input.set_game_style == 'bold'",
+                                  HTML("Fish with dynamite. Keep your opponents guessing. <br/>
+                                           <b>Pros:</b> Your game will be driven with bold, high probabilty guesses and the occassional self-incrimation to keep your opponents on their toes. <br/>
+                                           <b>Cons:</b> This is a quick game. If you're too bold too often, your opponents will learn your hand.")
+                                  ),
+                 style = "font-size:14pt"
+               )#End span
+        )
+      ),
       actionButton("set_game", label = "Let's play!")
     ), #End game setup conditional panel
     
@@ -93,16 +99,8 @@ ui <- shinydashboard::dashboardPage(
                    )
                  ),
                  fluidRow(
-                   uiOutput("whats_in_the_envelope")
-                   # column(width = 3,
-                   #        htmlOutput("probs_who")
-                   # ),
-                   # column(width = 3,
-                   #        htmlOutput("probs_what")
-                   # ),
-                   # column(width = 3,
-                   #        htmlOutput("probs_where")
-                   # )
+                   uiOutput("whats_in_the_envelope"),
+                   hr()
                  ),
                  fluidRow(
                    column(width = 12, tableOutput("clue_tracker_table"))
@@ -171,6 +169,20 @@ server <- function(input, output, session) {
       return(sel_player)
     })
     return(player_list()[p_list])
+  })
+  
+  #CLue count helper text
+  output$set_game_player_text <- renderText({
+    num_players <- as.numeric(input$set_game_players)
+    
+    clue_cnt <- clue_counts(num_players)
+    
+    txt1 <- glue::glue("In games with {num_players} players, each player receives {clue_cnt[[1]]} clues cards.")
+    txt2 <- if(num_players %in% 4:5){
+      glue::glue("With this number of players, the remaining {clue_cnt[[2]]} clues are placed face-up on the table for all players to see.")
+    } else {""}
+    
+    return(paste(txt1, txt2))
   })
   
   ####
@@ -450,42 +462,7 @@ server <- function(input, output, session) {
     ))
     
   })
-  
-  # output$probs_who <- renderText({
-  #   set_wh <- sort(rumor_prior()$who, decreasing = TRUE)
-  #   
-  #   list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
-  #   
-  #   list_wh <- paste("<table><col width='130'><col width='80'>", 
-  #                     paste(unlist(list_wh), collapse = " "), "</table>")
-  #   
-  #   return(list_wh)
-  # })
-  # output$probs_what <- renderText({
-  #   set_wh <- sort(rumor_prior()$what, decreasing = TRUE)
-  #   
-  #   list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
-  #   
-  #   list_wh <- paste("<table><col width='130'><col width='80'>", 
-  #                    paste(unlist(list_wh), collapse = " "), "</table>")
-  #   
-  #   return(list_wh)
-  # })
-  # output$probs_where <- renderText({
-  #   set_wh <- sort(rumor_prior()$where, decreasing = TRUE)
-  #   
-  #   list_wh <- purrr::map(1:length(set_wh), function(x){clue_tracker_table(x, set_wh)})
-  #   
-  #   list_wh <- paste("<table><col width='130'><col width='80'>", 
-  #                    paste(unlist(list_wh), collapse = " "), "</table>")
-  #   
-  #   return(list_wh)
-  # })
 
-  
-
-  
-  
   
 }
 
