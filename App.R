@@ -102,6 +102,9 @@ ui <- shinydashboard::dashboardPage(
                    column(width = 3,
                           htmlOutput("probs_where")
                    )
+                 ),
+                 fluidRow(
+                   column(width = 12, tableOutput("clue_tracker_table"))
                  )
                  ),
         tabPanel(title = "Game Turns",
@@ -193,7 +196,7 @@ server <- function(input, output, session) {
           column(width = 3, selectInput(paste0("turn_", input$turn_add, "_disprovedby"),
                                         label = "", choices = list("Disproved By" = "none", "Player" = player_list()))),
           column(width = 3, selectInput(paste0("turn_", input$turn_add, "_disprovedclue"),
-                                        label = "", choices = list("Disproved Clue" = "none", "Clue" = clue)))
+                                        label = "", choices = list("Disproved Clue" = "none", "Clue" = clue_master_list)))
         ), #ENd Row
         hr()
       )
@@ -228,10 +231,14 @@ server <- function(input, output, session) {
   turn_tracker2 <- reactive({
     req(turn_tracker())
     
+    player_list <- player_list()
+    n_players <- length(player_list)
+    
     dat <- turn_tracker() %>% 
       #Players who failed to disprove a rumor
       rowwise() %>% 
-      mutate(cannot_disprove = map2(which(player_list == guessedby), which(player_list == disprovedby), function(a, b){
+      mutate(disprovedby2 = ifelse(disprovedby == "none", 0, which(player_list == disprovedby))) %>% 
+      mutate(cannot_disprove = map2(which(player_list == guessedby), disprovedby2, function(a, b){
         calc_player_dist(a, b, n_players, player_list)
       })) %>% 
       ungroup()
@@ -280,19 +287,35 @@ server <- function(input, output, session) {
   # Individual clue trackers
   ###
   clue_tracker_by_me <- reactive({
-    clues_possessed_by_me <- tibble::tibble(clue_type = "who", clue = input$set_game_who) %>% 
-      bind_rows(tibble::tibble(clue_type = "what", clue = input$set_game_what)) %>% 
-      bind_rows(tibble::tibble(clue_type = "where", clue = input$set_game_where)) %>% 
+    game_who <- input$set_game_who
+    if(length(game_who) == 0){game_who <- "none"}
+    game_what <- input$set_game_what
+    if(length(game_what) == 0){game_what <- "none"}
+    game_where <- input$set_game_where
+    if(length(game_where) == 0){game_where <- "none"}
+    
+    clues_possessed_by_me <- tibble::tibble(clue_type = "who", clue = game_who) %>% 
+      bind_rows(tibble::tibble(clue_type = "what", clue = game_what)) %>% 
+      bind_rows(tibble::tibble(clue_type = "where", clue = game_where)) %>% 
+      filter(clue != "none") %>% 
       mutate(player = player_list_me())
     
     return(clues_possessed_by_me)
   })
   
   clue_tracker_by_public <- reactive({
-    clues_possessed_by_public <- tibble::tibble(clue_type = "who", clue = input$set_game_who_pub) %>% 
-      bind_rows(tibble::tibble(clue_type = "what", clue = input$set_game_what_pub)) %>% 
-      bind_rows(tibble::tibble(clue_type = "where", clue = input$set_game_where_pub)) %>% 
-      mutate(player = ".PublicPool")
+    game_who <- input$set_game_who_pub
+    if(length(game_who) == 0){game_who <- "none"}
+    game_what <- input$set_game_what_pub
+    if(length(game_what) == 0){game_what <- "none"}
+    game_where <- input$set_game_where_pub
+    if(length(game_where) == 0){game_where <- "none"}
+    
+    clues_possessed_by_public <- tibble::tibble(clue_type = "who", clue = game_who) %>% 
+      bind_rows(tibble::tibble(clue_type = "what", clue = game_what)) %>% 
+      bind_rows(tibble::tibble(clue_type = "where", clue = game_where)) %>% 
+      filter(clue != "none") %>% 
+      mutate(player = ".PublicClues")
     
     return(clues_possessed_by_public)
   })
@@ -300,7 +323,8 @@ server <- function(input, output, session) {
   clue_tracker <- reactive({
     req(turn_tracker2())
     
-    dat <- turn_tracker2
+    dat <- turn_tracker2()
+    player_list <- player_list()
     
     #3-Series data frames... clue_type, clue, player
     clues_possessed_by_me <- clue_tracker_by_me()
@@ -310,10 +334,11 @@ server <- function(input, output, session) {
     clues_possessed_by_others <- dat %>% 
       filter(disprovedclue != "none") %>% 
       select(player = disprovedby, clue = disprovedclue) %>% 
+      distinct() %>% 
       mutate(clue_type = case_when(
         clue %in% clue_master_list$who ~ "who",
         clue %in% clue_master_list$what ~ "what", 
-        clue %in% clue_master_list$what ~ "where",
+        clue %in% clue_master_list$where ~ "where",
         TRUE ~ "error"
       ))
     
@@ -324,7 +349,8 @@ server <- function(input, output, session) {
       select(-guessedby, -cannot_disprove, -disprovedclue) %>% 
       rename(player = disprovedby) %>% 
       gather(clue_type, clue, who, what, where) %>% 
-      arrange(turn)
+      arrange(turn) %>% 
+      count(player, clue_type, clue)
     
     #Create a 3-series data frame of each card NOT possessed by players
     clues_not_possessed <- dat %>% 
@@ -334,8 +360,61 @@ server <- function(input, output, session) {
       gather(clue_type, clue, who, what, where) %>% 
       distinct() %>% 
       arrange(player, clue_type)
+    
+    #BRING TOGETHER INTO A SINGLE ARRAY
+    clue_tracker <- tibble::tibble(clue_type = "who", clue = clue_master_list$who) %>% 
+      bind_rows(tibble::tibble(clue_type = "what", clue = clue_master_list$what)) %>% 
+      bind_rows(tibble::tibble(clue_type = "where", clue = clue_master_list$where)) %>% 
+      mutate(player = ".Envelope") %>% 
+      complete(nesting(clue_type, clue), player = c(player_list, ".PublicClues", ".Envelope")) %>% 
+      #Bring in known clues
+      left_join(bind_rows(list(clues_possessed_by_me, 
+                               clues_possessed_by_public, 
+                               clues_possessed_by_others)) %>% 
+                  distinct() %>% 
+                  mutate(.verified = 1)) %>% 
+      #Bring in possible clues
+      left_join(clues_maybe_possessed %>% rename(.possible = n)) %>% 
+      #Bring in known NON possessions
+      left_join(clues_not_possessed %>% mutate(.notpossessed = 0)) %>% 
+      #Check for issues
+      mutate(flag = .verified == 1 & .notpossessed == 0) %>% 
+      #Go over what we know by clue
+      group_by(clue) %>% 
+      #Clean up NAs in Verified if possible
+      mutate(.verified2 = ifelse(is.na(.verified) & any(.verified == 1), 0, .verified),
+             #If no infomation, gets a unit probability. Each additional rumor disproven adds a unit
+             .possible2 = ifelse(is.na(.possible), 1, 2^(.possible)),
+             #If Public Clue or ME doesn't have a card, we know they don't possess it
+             .notpossessed2 = ifelse(player == ".PublicClues"   & is.na(.verified), 0, .notpossessed),
+             .notpossessed2 = ifelse(player == player_list_me() & is.na(.verified), 0, .notpossessed2),
+             .notpossessed2 = ifelse(is.na(.notpossessed2), 1, 0),
+             .prob_scaled = ifelse(is.na(.verified2), .possible2 * .notpossessed2, .verified2 * .possible2)) %>% 
+      # THIS GIVES US INDEPENDENT PROBABILITIES FOR EACH CLUE
+      ungroup()
+    
+    #Iterative scaling for probabilities... tying Clue distribution to 1 and PLayer distribution to N
+    clue_tracker2 <- clue_tracker %>% 
+      scale_to_clue() %>% 
+      scale_to_player() %>% 
+      scale_to_clue() %>% 
+      scale_to_player() %>% 
+      scale_to_clue() %>% 
+      scale_to_player() %>% 
+      scale_to_clue() %>% 
+      scale_to_player() %>%
+      mutate(.prob_scaled = round(.prob_scaled, 0))
+    
+    clue_tracker_spread <- clue_tracker2 %>% 
+      select(clue_type, clue, player, .prob_scaled) %>% 
+      spread(player, .prob_scaled)
+    
+    return(clue_tracker_spread)
   })
   
+  output$clue_tracker_table <- renderTable(
+    clue_tracker()
+  )
   #Print Table - redo this later
   
   output$probs_who <- renderText({
