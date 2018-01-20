@@ -134,18 +134,18 @@ server <- function(input, output, session) {
   #PLayers 
   # output$set_game_players_names_ui <- renderUI({
   #   lapply(1:as.numeric(input$set_game_players), function(i){
-  #     list(
-  #       fluidRow(
-  #         column(width = 3,
-  #                textInput(inputId = paste0("set_game_players_", i), 
-  #                          label = paste("Player", i))
-  #                ),
-  #         column(width = 9,
-  #                checkboxInput(inputId = paste0("set_game_players_", i, "_me"), 
-  #                              label = "This is me!")
-  #                )
-  #       )
-  #     )
+      # list(
+      #   fluidRow(
+      #     column(width = 3,
+      #            textInput(inputId = paste0("set_game_players_", i),
+      #                      label = paste("Player", i))
+      #            ),
+      #     column(width = 9,
+      #            checkboxInput(inputId = paste0("set_game_players_", i, "_me"),
+      #                          label = "This is me!")
+      #            )
+      #   )
+      # )
   #   })
   # }) #End play list
   
@@ -160,8 +160,18 @@ server <- function(input, output, session) {
       insertUI(
         selector = "#set_game_players_add",
         where = "beforeBegin",
-        ui = textInput(inputId = paste0("set_game_players_", num_add), 
-                       label = paste0("Player ", num_add))
+        ui = list(
+          fluidRow(
+            column(width = 3,
+                   textInput(inputId = paste0("set_game_players_", num_add),
+                             label = paste("Player", num_add))
+            ),
+            column(width = 9,
+                   checkboxInput(inputId = paste0("set_game_players_", num_add, "_me"),
+                                 label = "This is me!")
+            )
+          )
+        )
       )
     }
   }) #End turn tracker UI
