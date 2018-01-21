@@ -20,13 +20,14 @@ ui <- shinydashboard::dashboardPage(
                 # radioButtons("set_game_players", label = "Number of players (including yourself!)",
                 #              choices = 3:6, selected = 3, inline = TRUE),
                 #uiOutput("set_game_players_names_ui"),
+                h3(textOutput("player_count")),
                 actionButton("set_game_players_add", "Add a player"),
                 #actionButton("set_game_players_rem", "Drop a player"),
                 span(textOutput("set_game_player_text"), style = "color:#0063fb; font-size:14pt")
         )
       ),
       conditionalPanel(
-        condition = "input.set_game_players == 4 | input.set_game_players == 5",
+        condition = "output.player_count == '4-player game' | output.player_count == '5-player game'",
         h3("Which clues are public?"),
         fluidRow(
           column(width = 9,
@@ -194,6 +195,11 @@ server <- function(input, output, session) {
     
     return(n_player)
 
+  })
+  
+  output$player_count <- reactive({
+    txt <- paste0(player_count(), "-player game")
+    return(txt)
   })
   
   player_list <- reactive({
