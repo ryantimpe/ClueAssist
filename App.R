@@ -1,5 +1,6 @@
 library(shiny); library(shinydashboard)
-library(purrr); library(dplyr); library(glue)
+library(purrr); library(dplyr); library(tidyr)
+library(glue)
 
 source("helpers.R")
 
