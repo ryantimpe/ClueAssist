@@ -117,7 +117,14 @@ ui <- shinydashboard::dashboardPage(
                  #actionButton("turn_log", "Update!"),
                  actionButton("turn_add", "Add a turn!")),
         tabPanel(title = "Player Hands",
-                 icon = icon("users"))
+                 icon = icon("users"),
+                 fluidRow(
+                   h3("Player Clue Probabilties"),
+                   span("These tables list the likelihood of the clues a player may possess. Percentages sum to the number of cards in their hands.",
+                        style = "font-size:14pt"),
+                   uiOutput("whats_in_each_hand")
+                 )
+        )#ENd player hands tab
       )
       #Here - suggested guess for next turn
       
@@ -483,6 +490,10 @@ server <- function(input, output, session) {
       scale_to_player(player_list) %>% 
       scale_to_clue() %>% 
       scale_to_player(player_list) %>%
+      scale_to_clue() %>% 
+      scale_to_player(player_list) %>%
+      scale_to_clue() %>% 
+      scale_to_player(player_list) %>%
       mutate(.prob_scaled = round(.prob_scaled, 0))
     
     return(clue_tracker2)
@@ -521,6 +532,35 @@ server <- function(input, output, session) {
     ))
     
   })
+  
+  output$whats_in_each_hand <- renderUI({
+    player_list <- player_list()[player_list() != player_list_me()]
+    
+    clue_probs <- lapply(player_list, function(y){
+      
+      set_wh <- clue_tracker() %>% 
+        filter(player == y, .prob_scaled > 0) %>% 
+        arrange(desc(.prob_scaled))
+      
+      list_wh <- purrr::map(1:nrow(set_wh), function(x){hand_tracker_table(x, set_wh)})
+      
+      list_wh <- paste("<h3>", y, "</h3><br/>",
+                       "<table><col width='130'><col width='80'>", 
+                       paste(unlist(list_wh), collapse = " "), "</table>")
+      return(list_wh)
+    })
+    
+    op <- lapply(clue_probs, function(z){
+      return(tagList(
+        column(width = 4, HTML(z)))
+        )
+    })
+    
+    return(op)
+    
+  })
+  
+  
 
   
 }

@@ -38,6 +38,27 @@ clue_tracker_table <- function(i, clue_list){
   return(rw)
 }
 
+hand_tracker_table <- function(i, clue_df){
+  
+  clue_type <- clue_df$clue_type[i]
+  clue      <- clue_df$clue[i]
+  prob      <- clue_df$.prob_scaled[i]
+  
+  if(prob == 100){
+    rw <- paste0("<tr>", "<td style='color:#0063fb; background-color:#FFFF40; font-weight:bold'> ",
+                 clue, "</td> <td style='color:#FF4040'>",
+                 round(prob), "%", " </td></tr>")
+  } else if(prob >= 50){
+    rw <- paste0("<tr>", "<td style='color:#0063fb; font-weight:bold'> ",
+                 clue, "</td> <td style='color:#0063fb'>",
+                 round(prob), "%", " </td></tr>")
+  } else {
+    rw <- paste0("<tr><td>", clue, " <td>", round(prob), "%", " </tr>")
+  }
+  return(rw)
+}
+
+
 calc_player_dist <- function(g_pos, d_pos, n_players, p_list){
   dist <- (d_pos - g_pos) %% n_players - 1
   
