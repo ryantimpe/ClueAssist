@@ -51,7 +51,7 @@ ui <- shinydashboard::dashboardPage(
           )
         )
       ),
-      h3("Which clue have you been dealt?"),
+      h3("Which clues have you been dealt?"),
       fluidRow(
         column(width = 3,
                checkboxGroupInput("set_game_who" , label = "Who?",
@@ -107,7 +107,7 @@ ui <- shinydashboard::dashboardPage(
                    hr()
                  ),
                  fluidRow(
-                   column(width = 12, tableOutput("clue_tracker_table"))
+                   #column(width = 12, tableOutput("clue_tracker_table"))
                  )
                  ),
         tabPanel(title = "Game Turns",
